@@ -16,10 +16,24 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: black;
+      background: transparent;
     }
 
-    /* Màn hình bắt đầu - bắt buộc trên iOS để xin quyền camera đúng cách */
+    a-scene video,
+    .mindar-video,
+    video {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      z-index: -2 !important;
+    }
+    a-scene canvas {
+      z-index: -1 !important;
+    }
+
     #startScreen {
       position: fixed;
       inset: 0;
@@ -52,7 +66,18 @@
       max-width: 320px;
       display: none;
     }
-    #scene-container { width: 100%; height: 100%; }
+    #scanHint {
+      position: fixed;
+      bottom: 90px;
+      left: 0; right: 0;
+      text-align: center;
+      color: #fff;
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 14px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      z-index: 10;
+      display: none;
+    }
   </style>
 
   <script>
@@ -76,12 +101,15 @@
     <div id="errorMsg"></div>
   </div>
 
+  <div id="scanHint">Hướng camera vào ảnh mục tiêu</div>
+
   <div id="scene-container"></div>
 
   <script>
     const startBtn = document.getElementById('startBtn');
     const startScreen = document.getElementById('startScreen');
     const errorMsg = document.getElementById('errorMsg');
+    const scanHint = document.getElementById('scanHint');
 
     function showError(text) {
       errorMsg.style.display = 'block';
@@ -89,27 +117,22 @@
     }
 
     startBtn.addEventListener('click', async function () {
-      // Xin quyền camera bằng tương tác trực tiếp của người dùng (quan trọng với iOS Safari)
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' }
         });
-        // Dừng stream tạm này lại để MindAR tự mở camera của nó
         stream.getTracks().forEach(t => t.stop());
       } catch (e) {
         if (e.name === 'NotAllowedError') {
-          showError('Quyền camera bị từ chối. Vào Cài đặt > Safari > Camera để cho phép, rồi tải lại trang.');
-        } else if (e.name === 'NotFoundError') {
-          showError('Không tìm thấy camera trên thiết bị.');
+          showError('Quyen camera bi tu choi. Vao Cai dat > Safari > Camera de cho phep, roi tai lai.');
         } else if (location.protocol !== 'https:') {
-          showError('Camera chỉ chạy trên HTTPS. Hãy mở trang bằng https://');
+          showError('Camera chi chay tren HTTPS. Hay mo bang https://');
         } else {
-          showError('Không mở được camera: ' + e.message);
+          showError('Khong mo duoc camera: ' + e.message);
         }
         return;
       }
 
-      // Quyền OK -> dựng scene AR
       startScreen.style.display = 'none';
       buildScene();
     });
@@ -118,9 +141,9 @@
       const container = document.getElementById('scene-container');
       container.innerHTML = `
         <a-scene
-          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; autoStart: true;"
+          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; autoStart: true; uiScanning: no; uiLoading: no;"
           color-space="sRGB"
-          renderer="colorManagement: true"
+          renderer="colorManagement: true; alpha: true"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
 
@@ -141,6 +164,18 @@
           </a-entity>
         </a-scene>
       `;
+
+      const scene = container.querySelector('a-scene');
+
+      scene.addEventListener('loaded', function () {
+        scanHint.style.display = 'block';
+      });
+      scene.addEventListener('targetFound', function () {
+        scanHint.style.display = 'none';
+      });
+      scene.addEventListener('targetLost', function () {
+        scanHint.style.display = 'block';
+      });
     }
   </script>
 </body>
