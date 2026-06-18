@@ -1,118 +1,147 @@
 <!DOCTYPE html>
-
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Socccaro AR</title>
 
-<meta charset="utf-8">
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+    }
 
-<title>Socccaro AR</title>
+    /* Màn hình bắt đầu - bắt buộc trên iOS để xin quyền camera đúng cách */
+    #startScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, system-ui, sans-serif;
+      text-align: center;
+      padding: 24px;
+    }
+    #startScreen h1 { font-size: 20px; margin-bottom: 8px; }
+    #startScreen p { font-size: 14px; opacity: 0.8; margin: 4px 0 24px; }
+    #startBtn {
+      padding: 14px 32px;
+      font-size: 17px;
+      border: none;
+      border-radius: 999px;
+      background: #fff;
+      color: #000;
+      font-weight: 600;
+    }
+    #errorMsg {
+      color: #ff6b6b;
+      font-size: 13px;
+      margin-top: 16px;
+      max-width: 320px;
+      display: none;
+    }
+    #scene-container { width: 100%; height: 100%; }
+  </style>
 
-<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
-<style>
-
-html,
-body {
-
-margin:0;
-padding:0;
-
-width:100%;
-height:100%;
-
-overflow:hidden;
-
-background:black;
-
-}
-
-</style>
-
-<script>
-
-AFRAME.registerComponent('camera-parallax', {
-
-tick: function() {
-
-const camera =
-document.querySelector('[camera]');
-
-if (!camera) return;
-
-const camRot =
-camera.object3D.rotation;
-
-this.el.object3D.rotation.y =
-camRot.y * 0.12;
-
-this.el.object3D.rotation.x =
-camRot.x * 0.08;
-
-}
-
-});
-
-</script>
-
+  <script>
+    AFRAME.registerComponent('camera-parallax', {
+      tick: function () {
+        const camera = document.querySelector('[camera]');
+        if (!camera) return;
+        const camRot = camera.object3D.rotation;
+        this.el.object3D.rotation.y = camRot.y * 0.12;
+        this.el.object3D.rotation.x = camRot.x * 0.08;
+      }
+    });
+  </script>
 </head>
-
 <body>
 
-<a-scene
+  <div id="startScreen">
+    <h1>Socccaro AR</h1>
+    <p>Nhấn để bật camera và hướng vào ảnh mục tiêu</p>
+    <button id="startBtn">Bắt đầu AR</button>
+    <div id="errorMsg"></div>
+  </div>
 
-mindar-image="
-imageTargetSrc: ./targets.mind;
-maxTrack: 1;
-"
+  <div id="scene-container"></div>
 
-color-space="sRGB"
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const startScreen = document.getElementById('startScreen');
+    const errorMsg = document.getElementById('errorMsg');
 
-renderer="colorManagement: true"
+    function showError(text) {
+      errorMsg.style.display = 'block';
+      errorMsg.textContent = text;
+    }
 
-vr-mode-ui="enabled: false"
+    startBtn.addEventListener('click', async function () {
+      // Xin quyền camera bằng tương tác trực tiếp của người dùng (quan trọng với iOS Safari)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        // Dừng stream tạm này lại để MindAR tự mở camera của nó
+        stream.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        if (e.name === 'NotAllowedError') {
+          showError('Quyền camera bị từ chối. Vào Cài đặt > Safari > Camera để cho phép, rồi tải lại trang.');
+        } else if (e.name === 'NotFoundError') {
+          showError('Không tìm thấy camera trên thiết bị.');
+        } else if (location.protocol !== 'https:') {
+          showError('Camera chỉ chạy trên HTTPS. Hãy mở trang bằng https://');
+        } else {
+          showError('Không mở được camera: ' + e.message);
+        }
+        return;
+      }
 
-device-orientation-permission-ui="enabled: false"
+      // Quyền OK -> dựng scene AR
+      startScreen.style.display = 'none';
+      buildScene();
+    });
 
->
+    function buildScene() {
+      const container = document.getElementById('scene-container');
+      container.innerHTML = `
+        <a-scene
+          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; autoStart: true;"
+          color-space="sRGB"
+          renderer="colorManagement: true"
+          vr-mode-ui="enabled: false"
+          device-orientation-permission-ui="enabled: false">
 
-<a-assets>
+          <a-assets>
+            <a-asset-item id="model" src="./soccaro-moon-2_5d.glb"></a-asset-item>
+          </a-assets>
 
-<a-asset-item
-id="model"
-src="./soccaro-moon-2.5d.glb"> </a-asset-item>
+          <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
 
-</a-assets>
-
-<a-camera
-position="0 0 0"
-look-controls="enabled:false"> </a-camera>
-
-<a-entity
-mindar-image-target="targetIndex: 0">
-
-<a-gltf-model
-
-src="#model"
-
-camera-parallax
-
-position="0 0 0"
-
-rotation="0 0 0"
-
-scale="0.35 0.35 0.35">
-
-</a-gltf-model>
-
-</a-entity>
-
-</a-scene>
-
+          <a-entity mindar-image-target="targetIndex: 0">
+            <a-gltf-model
+              src="#model"
+              camera-parallax
+              position="0 0 0"
+              rotation="0 0 0"
+              scale="0.35 0.35 0.35">
+            </a-gltf-model>
+          </a-entity>
+        </a-scene>
+      `;
+    }
+  </script>
 </body>
 </html>
